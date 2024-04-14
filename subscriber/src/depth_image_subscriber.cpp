@@ -7,47 +7,49 @@
 class DepthImageSubscriber : public rclcpp::Node
 {
 public:
-  DepthImageSubscriber(const std::string& topic_name) : Node("depth_image_subscriber")
+  DepthImageSubscriber(const std::string &topic_name) : Node("depth_image_subscriber")
   {
     // Subscribe to the depth image topic
     subscription_ = this->create_subscription<sensor_msgs::msg::Image>(
-      topic_name,
-      rclcpp::QoS(10),
-      std::bind(&DepthImageSubscriber::depthImageCallback, this, std::placeholders::_1)
-    );
+        topic_name,
+        rclcpp::QoS(10),
+        std::bind(&DepthImageSubscriber::depthImageCallback, this, std::placeholders::_1));
   }
 
 private:
   void depthImageCallback(const sensor_msgs::msg::Image::SharedPtr msg)
   {
     // Convert the sensor_msgs::Image to cv::Mat
-    cv::Mat depth_image(msg->height, msg->width, CV_32FC1, const_cast<float*>(reinterpret_cast<const float*>(&msg->data[0])), msg->step);
-
-    // Save the depth values as a CSV file
-    std::string filePath = "save_data/depth_image.csv";
-    std::ofstream outFile(filePath);
-    for (int i = 0; i < depth_image.rows; ++i)
+    if (msg->width == 320)
     {
-      for (int j = 0; j < depth_image.cols; ++j)
+      cv::Mat depth_image(msg->height, msg->width, CV_16UC1, const_cast<uint16_t *>(reinterpret_cast<const uint16_t *>(&msg->data[0])), msg->step);
+      // Save the depth values as a CSV file
+      std::string filePath = "save_data/depth_image.csv";
+      std::ofstream outFile(filePath);
+      for (int i = 0; i < depth_image.rows; ++i)
       {
-        outFile << depth_image.at<float>(i, j) << ",";
+        for (int j = 0; j < depth_image.cols; ++j)
+        {
+          outFile << static_cast<double>(depth_image.at<uint16_t>(i, j)) * 0.001 << ",";
+        }
+        outFile << "\n";
       }
-      outFile << "\n";
+      outFile.close();
+
+      RCLCPP_INFO(this->get_logger(), "Depth image saved: %s", filePath.c_str());
+
+      // Shutdown the node after receiving the depth image
+      rclcpp::shutdown();
     }
-    outFile.close();
-
-    RCLCPP_INFO(this->get_logger(), "Depth image saved: %s", filePath.c_str());
-
-    // Shutdown the node after receiving the depth image
-    rclcpp::shutdown();
   }
 
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr subscription_;
 };
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
-  if (argc < 2) {
+  if (argc < 2)
+  {
     printf("Usage: depth_image_subscriber <topic_name>\n");
     return 1;
   }

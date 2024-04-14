@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(subscriber)
+project(data_subscriber)
 
 # Default to C99
 if(NOT CMAKE_C_STANDARD)
@@ -25,6 +25,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 add_executable(image_subscriber src/image_subscriber.cpp)
 target_include_directories(image_subscriber PRIVATE ${OpenCV_INCLUDE_DIRS})
@@ -39,10 +40,14 @@ ament_target_dependencies(depth_image_subscriber rclcpp sensor_msgs)
 add_executable(laser_scan_subscriber src/laser_scan_subscriber.cpp)
 ament_target_dependencies(laser_scan_subscriber rclcpp sensor_msgs)
 
+add_executable(control_speed src/control_speed.cpp)
+ament_target_dependencies(control_speed rclcpp geometry_msgs)
+
 install(TARGETS
         image_subscriber
         depth_image_subscriber
         laser_scan_subscriber
+        control_speed
         DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY launch

@@ -21,6 +21,7 @@ private:
   {
     // Convert the sensor_msgs::Image to cv::Mat
     cv::Mat image(msg->height, msg->width, CV_8UC3, const_cast<unsigned char*>(msg->data.data()), msg->step);
+    cv::cvtColor(image, image, cv::COLOR_RGB2BGR);
     std::string filePath = "save_data/image.png";
     cv::imwrite(filePath, image);
     RCLCPP_INFO(this->get_logger(), "Image saved: %s", filePath.c_str());
