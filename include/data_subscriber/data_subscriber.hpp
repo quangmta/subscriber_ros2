@@ -11,25 +11,35 @@
 class DataSubscriber : public rclcpp::Node
 {
 public:
-    explicit DataSubscriberNode(const rclcpp::NodeOptions &options);
-    ~DataSubscriberNode();
+    explicit DataSubscriber(const rclcpp::NodeOptions &options);
+    ~DataSubscriber();
 
 private:
     void ScanCallback(const sensor_msgs::msg::LaserScan::SharedPtr scan);
     void ImageCallback(const sensor_msgs::msg::Image::SharedPtr image);
     void InfoCallback(const sensor_msgs::msg::CameraInfo::SharedPtr camera_info);
     void DepthImageCallback(const sensor_msgs::msg::Image::SharedPtr depth);
-    void DataCallback(const sensor_msgs::msg::Odometry::SharedPtr odom);
+    void DataCallback(const nav_msgs::msg::Odometry::SharedPtr odom);
+    bool CheckNullMsg();
+    void SaveImage();
+    void SaveDepthImage();
+    void SaveLaserScan();
+    void SaveCameraInfo();
+    void SaveOdometry();
+    geometry_msgs::msg::Twist TwistSet(double x, double y, double z, double roll, double pitch, double yaw);
 
     sensor_msgs::msg::LaserScan::SharedPtr scan_msg_;
     sensor_msgs::msg::Image::SharedPtr image_msg_;
     sensor_msgs::msg::Image::SharedPtr depth_image_msg_;
     sensor_msgs::msg::CameraInfo::SharedPtr camera_info_msg_;
-    sensor_msgs::msg::Odometry::SharedPtr odom_msg_;
+    nav_msgs::msg::Odometry::SharedPtr odom_msg_;
+    int count_ = 0;
+    std::string folder;
 
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub_;
     rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_sub_;
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_image_sub_;
     rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
-    rclcpp::Subscription<sensor_msgs::msg::Odometry>::SharedPtr odom_sub_;
-}
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+    rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr twist_pub_;
+};

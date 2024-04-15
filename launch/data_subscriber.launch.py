@@ -10,13 +10,13 @@ def generate_launch_description():
             package='data_subscriber',
             executable='data_subscriber_node',
             name='data_subscriber_node',
-            # remappings=[('/image','/camera/color/image_raw'),
-            #             ('/depth','/camera/aligned_depth_to_color/image_raw'),
-            #             ('/camera_info', '/camera/color/camera_info'),
-            #             ('/laser', '/scan')],
-            remappings=[('/image','/rgb_image_sync'),
-                        ('/depth','/estimated_depth'),
+            remappings=[('/image','/camera/color/image_raw'),
+                        ('/depth','/camera/aligned_depth_to_color/image_raw'),
                         ('/camera_info', '/camera/color/camera_info'),
-                        ('/scan', '/scan')]        
+                        ('/laser', '/processed_scan')],
+            # remappings=[('/image','/rgb_image_sync'),
+            #             ('/depth','/estimated_depth'),
+            #             ('/camera_info', '/camera/color/camera_info'),
+            #             ('/scan', '/scan')]        
         )
     ])

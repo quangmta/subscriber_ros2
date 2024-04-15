@@ -26,6 +26,10 @@ find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(image_geometry REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(tf2 REQUIRED)
 
 add_executable(image_subscriber src/image_subscriber.cpp)
 target_include_directories(image_subscriber PRIVATE ${OpenCV_INCLUDE_DIRS})
@@ -40,18 +44,49 @@ ament_target_dependencies(depth_image_subscriber rclcpp sensor_msgs)
 add_executable(laser_scan_subscriber src/laser_scan_subscriber.cpp)
 ament_target_dependencies(laser_scan_subscriber rclcpp sensor_msgs)
 
-add_executable(control_speed src/control_speed.cpp)
-ament_target_dependencies(control_speed rclcpp geometry_msgs)
+
+add_library(DataSubscriber
+  src/data_subscriber.cpp
+)
+ament_target_dependencies(DataSubscriber
+  rclcpp
+  sensor_msgs
+  geometry_msgs
+  OpenCV
+  image_geometry
+  nav_msgs
+  tf2
+  tf2_geometry_msgs
+)
+target_include_directories(DataSubscriber PUBLIC
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>"
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  "$<INSTALL_INTERFACE:include>"
+)
+
+add_executable(data_subscriber_node src/data_main.cpp)
+
+target_link_libraries(data_subscriber_node DataSubscriber)
 
 install(TARGETS
         image_subscriber
         depth_image_subscriber
         laser_scan_subscriber
-        control_speed
+        data_subscriber_node
         DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY launch
         DESTINATION share/${PROJECT_NAME}/)
+
+        install(DIRECTORY include
+        DESTINATION include/
+      )    
+
+install(TARGETS DataSubscriber
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
