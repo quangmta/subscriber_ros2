@@ -7,6 +7,8 @@
 
 #include <fstream>
 #include <opencv2/opencv.hpp>
+#define YAW_VEL 0.25
+#define DELAY_TIME 1000
 
 class DataSubscriber : public rclcpp::Node
 {
@@ -32,10 +34,14 @@ private:
     sensor_msgs::msg::Image::SharedPtr image_msg_;
     sensor_msgs::msg::Image::SharedPtr depth_image_msg_;
     sensor_msgs::msg::CameraInfo::SharedPtr camera_info_msg_;
-    nav_msgs::msg::Odometry::SharedPtr odom_msg_;
+    nav_msgs::msg::Odometry::SharedPtr prev_odom_msg_;
+    nav_msgs::msg::Odometry::SharedPtr take_odom_msg_;
     nav_msgs::msg::Odometry::SharedPtr init_odom_msg_;
     int count_ = 0;
+    double init_yaw, take_yaw;
     double total_yaw = 0;
+    bool save_data = false;
+    bool count_data[3] = {false,false,false};
     std::string folder;
 
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub_;
