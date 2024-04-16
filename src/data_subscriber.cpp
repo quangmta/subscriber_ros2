@@ -30,10 +30,10 @@ DataSubscriber::DataSubscriber(const rclcpp::NodeOptions &options) : rclcpp::Nod
       std::bind(&DataSubscriber::DepthImageCallback, this, std::placeholders::_1));
 
   odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-      "/depth", qos,
+      "/odom", qos,
       std::bind(&DataSubscriber::DataCallback, this, std::placeholders::_1));
 
-  auto twist_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", qos);
+  twist_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", qos);
 }
 
 DataSubscriber::~DataSubscriber() {}
@@ -63,44 +63,47 @@ bool DataSubscriber::CheckNullMsg()
   bool flag_return = 0;
   if (nullptr == scan_msg_)
   {
-    RCLCPP_INFO(get_logger(), "No laser scan, skipping point cloud processing");
+    RCLCPP_INFO(get_logger(), "No laser scan, skip saving data");
     flag_return = 1;
   }
   if (nullptr == image_msg_)
   {
-    RCLCPP_INFO(get_logger(), "No image, skipping point cloud processing");
+    RCLCPP_INFO(get_logger(), "No image, skip saving data");
     flag_return = 1;
   }
   if (nullptr == camera_info_msg_)
   {
-    RCLCPP_INFO(get_logger(), "No camera info, skipping point cloud processing");
+    RCLCPP_INFO(get_logger(), "No camera info, skip saving data");
     flag_return = 1;
   }
 
   if (nullptr == depth_image_msg_)
   {
-    RCLCPP_INFO(get_logger(), "No depth camera info, skipping point cloud processing");
+    RCLCPP_INFO(get_logger(), "No depth camera info, skip saving data");
     flag_return = 1;
   }
 
-  if (image_msg_->height != depth_image_msg_->height || image_msg_->width != depth_image_msg_->width)
-  {
-    RCLCPP_INFO(get_logger(), "Difference size of image, skipping point cloud processing");
-    flag_return = 1;
-  }
+  if (flag_return == 0)
+    if (image_msg_->height != depth_image_msg_->height || image_msg_->width != depth_image_msg_->width)
+    {
+      RCLCPP_INFO(get_logger(), "Difference size of image, skip saving data");
+      flag_return = 1;
+    }
 
   return flag_return;
 }
 
 void DataSubscriber::DataCallback(const nav_msgs::msg::Odometry::SharedPtr odom)
 {
-  if (odom_msg_ == nullptr)
+  if (CheckNullMsg())
+    return;
+  if (init_odom_msg_ == nullptr)
   {
-    if (CheckNullMsg())
-      return;
+    RCLCPP_INFO(get_logger(), "Start collecting data");
 
     // Start taking data and spinning
     count_++;
+    init_odom_msg_ = odom;
     odom_msg_ = odom;
 
     //  Create folder
@@ -123,7 +126,6 @@ void DataSubscriber::DataCallback(const nav_msgs::msg::Odometry::SharedPtr odom)
       std::filesystem::create_directory(folder);
       std::filesystem::create_directory(folder + "/rgb");
       std::filesystem::create_directory(folder + "/depth");
-      std::filesystem::create_directory(folder + "/scan");
       RCLCPP_INFO(this->get_logger(), "Folders created successfully.");
     }
     catch (std::exception &e)
@@ -131,6 +133,9 @@ void DataSubscriber::DataCallback(const nav_msgs::msg::Odometry::SharedPtr odom)
       // Handle any exceptions that occur
       RCLCPP_INFO(this->get_logger(), "Error creating folder: %s", e.what());
     }
+
+    RCLCPP_INFO(get_logger(), "Collect data %d", count_);
+
     SaveCameraInfo();
     SaveImage();
     SaveDepthImage();
@@ -138,10 +143,14 @@ void DataSubscriber::DataCallback(const nav_msgs::msg::Odometry::SharedPtr odom)
     SaveOdometry();
 
     // start spinning
-    twist_pub_->publish(TwistSet(0.0, 0.0, 0.0, 0.0, 0.0, 1.0));
+    auto twist = TwistSet(0.0, 0.0, 0.0, 0.0, 0.0, 1.0);
+    RCLCPP_INFO(this->get_logger(), "Twist set yaw %f", twist->angular.z);
+    twist_pub_->publish(*twist);
+    RCLCPP_INFO(this->get_logger(), "Twist published");
   }
   else
   {
+    RCLCPP_INFO(get_logger(), "Checking angle %d", count_);
     // Check if angle spin is 22.5 or not
     tf2::Quaternion quat;
     tf2::fromMsg(odom->pose.pose.orientation, quat);
@@ -154,12 +163,21 @@ void DataSubscriber::DataCallback(const nav_msgs::msg::Odometry::SharedPtr odom)
 
     double delta_yaw = yaw - yaw_prev;
     if (yaw > M_PI / 2 && yaw_prev < -M_PI / 2)
-      delta_yaw -= 2*M_PI;
+      delta_yaw -= 2 * M_PI;
     else if (yaw < -M_PI / 2 && yaw_prev > M_PI / 2)
-      delta_yaw += 2*M_PI;
+      delta_yaw += 2 * M_PI;
+    total_yaw += delta_yaw;
+
+    if (std::fabs(total_yaw - 2 * M_PI) < M_PI / 128)
+    {
+      rclcpp::shutdown();
+      return;
+    }
 
     if (std::fabs(std::fabs(delta_yaw) - M_PI / 16) < M_PI / 128)
     {
+      count_++;
+      RCLCPP_INFO(get_logger(), "Angle valid, collect data %d", count_);
       SaveImage();
       SaveDepthImage();
       SaveLaserScan();
@@ -167,8 +185,12 @@ void DataSubscriber::DataCallback(const nav_msgs::msg::Odometry::SharedPtr odom)
     }
     else
     {
-      twist_pub_->publish(TwistSet(0.0, 0.0, 0.0, 0.0, 0.0, 1.0));
+      auto twist = TwistSet(0.0, 0.0, 0.0, 0.0, 0.0, 1.0);
+      twist_pub_->publish(*twist);
+      RCLCPP_INFO(this->get_logger(), "Twist set yaw %f", twist->angular.z);
     }
+
+    odom_msg_ = odom;
   }
 }
 void DataSubscriber::SaveImage()
@@ -209,13 +231,14 @@ void DataSubscriber::SaveDepthImage()
 void DataSubscriber::SaveLaserScan()
 {
   // Save the scan data as a CSV file
-  std::string filePath = folder + "/scan/" + std::to_string(count_) + ".csv ";
+  std::string filePath = folder + "/scan.csv ";
   std::ofstream outFile(filePath);
+  outFile << count_ << ",";
   for (size_t i = 0; i < scan_msg_->ranges.size(); ++i)
   {
-    outFile << scan_msg_->ranges[i];
-    outFile << "\n";
+    outFile << scan_msg_->ranges[i] << ",";
   }
+  outFile << "\n";
   outFile.close();
 
   RCLCPP_INFO(this->get_logger(), "Laser scan data saved: %s", filePath.c_str());
@@ -226,7 +249,7 @@ void DataSubscriber::SaveCameraInfo()
   image_geometry::PinholeCameraModel cam_model_;
   cam_model_.fromCameraInfo(camera_info_msg_);
   // Save the scan data as a CSV file
-  std::string filePath = folder + "CamInfo.csv ";
+  std::string filePath = folder + "/CamInfo.csv ";
   std::ofstream outFile(filePath);
   outFile << "width," << cam_model_.fullResolution().width << "\n";
   outFile << "height," << cam_model_.fullResolution().height << "\n";
@@ -241,7 +264,7 @@ void DataSubscriber::SaveCameraInfo()
 
 void DataSubscriber::SaveOdometry()
 {
-  std::string filePath = folder + "Odom.csv";
+  std::string filePath = folder + "/Odom.csv";
   std::ofstream outFile(filePath);
 
   tf2::Quaternion quat;
@@ -254,18 +277,19 @@ void DataSubscriber::SaveOdometry()
           << odom_msg_->pose.pose.position.y << ","
           << yaw << "\n";
   outFile.close();
+  RCLCPP_INFO(this->get_logger(), "Odom data saved: %s", filePath.c_str());
 }
 
-geometry_msgs::msg::Twist DataSubscriber::TwistSet(double x, double y, double z, double roll, double pitch, double yaw)
+geometry_msgs::msg::Twist::SharedPtr DataSubscriber::TwistSet(double x, double y, double z, double roll, double pitch, double yaw)
 {
   // Create a Twist message
-  geometry_msgs::msg::Twist twist;
+  auto twist = std::make_shared<geometry_msgs::msg::Twist>();
   // Set the linear and angular velocities
-  twist.linear.x = x;
-  twist.linear.y = y;
-  twist.linear.z = z;
-  twist.angular.x = roll;
-  twist.angular.y = pitch;
-  twist.angular.z = yaw;
+  twist->linear.x = x;
+  twist->linear.y = y;
+  twist->linear.z = z;
+  twist->angular.x = roll;
+  twist->angular.y = pitch;
+  twist->angular.z = yaw;
   return twist;
 }

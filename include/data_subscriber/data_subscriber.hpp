@@ -26,14 +26,16 @@ private:
     void SaveLaserScan();
     void SaveCameraInfo();
     void SaveOdometry();
-    geometry_msgs::msg::Twist TwistSet(double x, double y, double z, double roll, double pitch, double yaw);
+    geometry_msgs::msg::Twist::SharedPtr TwistSet(double x, double y, double z, double roll, double pitch, double yaw);
 
     sensor_msgs::msg::LaserScan::SharedPtr scan_msg_;
     sensor_msgs::msg::Image::SharedPtr image_msg_;
     sensor_msgs::msg::Image::SharedPtr depth_image_msg_;
     sensor_msgs::msg::CameraInfo::SharedPtr camera_info_msg_;
     nav_msgs::msg::Odometry::SharedPtr odom_msg_;
+    nav_msgs::msg::Odometry::SharedPtr init_odom_msg_;
     int count_ = 0;
+    double total_yaw = 0;
     std::string folder;
 
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub_;
