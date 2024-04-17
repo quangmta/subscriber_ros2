@@ -303,7 +303,7 @@ void DataSubscriber::SaveCameraInfo()
   cam_model_.fromCameraInfo(camera_info_msg_);
   // Save the scan data as a CSV file
   std::string filePath = folder + "/CamInfo.csv ";
-  std::fstream outFile(filePath, std::ios::in);
+  std::fstream outFile(filePath, std::ios::in | std::ios::out | std::ios::app);
   outFile << "width," << cam_model_.fullResolution().width << "\n";
   outFile << "height," << cam_model_.fullResolution().height << "\n";
   outFile << "fx," << cam_model_.fx() << "\n";
